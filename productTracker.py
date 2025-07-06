@@ -1,11 +1,14 @@
 import requests
 from bs4 import BeautifulSoup
+from datetime import datetime, timedelta
 
 # Constant Variables
 URL = "https://ado-shop.com/products/tyjt59012"
 HEADERS = {
     "User-Agent": "Mozilla/5.0"
 }
+ALERT_FILE = "last_alert.txt"
+ALERT_COOLDOWN_MINUTES = 15
 
 def is_item_available():
     try:
@@ -24,7 +27,15 @@ def is_item_available():
             return False
         else:
             print("[ALERT] Item may be back in stock!")
-            send_telegram_notification()
+            last_alert_time = get_last_alert_time()
+            now = datetime.now()
+
+            if not last_alert_time or now - last_alert_time > timedelta(minutes=ALERT_COOLDOWN_MINUTES):
+                print("[ALERT] Item may be back in stock! Sending alert...")
+                send_telegram_notification()
+                save_alert_time()
+            else:
+                print("[INFO] Item may be in stock, but last alert was sent recently. Skipping.")
             return True
         
     except requests.RequestException as e:
@@ -49,6 +60,19 @@ def send_telegram_notification():
         print("[INFO] Telegram notification sent.")
     except requests.RequestException as e:
         print(f"[ERROR] Failed to send Telegram message: {e}")
+
+def get_last_alert_time():
+    if os.path.exists(ALERT_FILE):
+        with open(ALERT_FILE, "r") as f:
+            try:
+                return datetime.fromisoformat(f.read().strip())
+            except ValueError:
+                return None
+    return None
+
+def save_alert_time():
+    with open(ALERT_FILE, "w") as f:
+        f.write(datetime.now().isoformat())
 
 # Run once (Render will schedule this hourly)
 if __name__ == "__main__":
